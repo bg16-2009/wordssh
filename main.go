@@ -43,10 +43,20 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		bg:             bg,
 		txtStyle:       txtStyle,
 		quitStyle:      quitStyle,
-		currentAttempt: 100,
-		currentChar:    100,
+		currentAttempt: 2,
+		currentChar:    1,
 		attempts:       6,
 		wordLenght:     5,
+	}
+
+    // This is temporary
+	m.gameState = [][]string{
+		{"a", "a", "a", "a", "a"},
+		{"a", "a", "a", "a", "a"},
+		{"a", "a", "a", "a", "a"},
+		{"a", "a", "a", "a", "a"},
+		{"a", "a", "a", "a", "a"},
+		{"a", "a", "a", "a", "a"},
 	}
 
 	return m, []tea.ProgramOption{tea.WithAltScreen()}
@@ -58,7 +68,7 @@ type model struct {
 	attempts       int
 	wordLenght     int
 	term           string
-	profile        string
+	gameState     [][]string
 	width          int
 	height         int
 	bg             string
@@ -88,14 +98,22 @@ func (m model) View() string {
 	s := "┌───┬───┬───┬───┬───┐\n"
 	for i := 0; i < m.attempts; i++ {
 		if i < m.currentAttempt {
-			s += "│"
+			s += "│ "
 			for j := 0; j < m.wordLenght; j++ {
-				s += " "
-				s += " │ "
+				s += m.gameState[i][j] + " │ "
 			}
 		}
 		if i == m.currentAttempt {
-			// TODO
+			s += "│ "
+			for j := 0; j < m.currentChar; j++ {
+				s += m.gameState[i][j] + " │ "
+			}
+			if m.currentChar != m.wordLenght {
+				s += "_ │ "
+			}
+			for j := m.currentChar + 2; j <= m.wordLenght; j++ {
+				s += "  │ "
+			}
 		}
 		if i > m.currentAttempt {
 			s += "│   │   │   │   │   │"

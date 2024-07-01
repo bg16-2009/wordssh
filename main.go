@@ -29,8 +29,6 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	pty, _, _ := s.Pty()
 
 	renderer := bubbletea.MakeRenderer(s)
-	txtStyle := renderer.NewStyle().Foreground(lipgloss.Color("10"))
-	quitStyle := renderer.NewStyle().Foreground(lipgloss.Color("8"))
 
 	bg := "light"
 	if renderer.HasDarkBackground() {
@@ -38,19 +36,26 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	}
 
 	m := model{
-		term:           pty.Term,
-		width:          pty.Window.Width,
-		height:         pty.Window.Height,
-		bg:             bg,
-		txtStyle:       txtStyle,
-		quitStyle:      quitStyle,
-		currentAttempt: 2,
-		currentChar:    1,
-		attempts:       6,
-		wordLenght:     5,
+		term:                 pty.Term,
+		width:                pty.Window.Width,
+		height:               pty.Window.Height,
+		bg:                   bg,
+        // TODO: Fix colors
+		txtStyle:             renderer.NewStyle().Foreground(lipgloss.Color("10")),
+		quitStyle:            renderer.NewStyle().Foreground(lipgloss.Color("8")),
+		incorrectLetterStyle: renderer.NewStyle().Foreground(lipgloss.Color("31")),
+		correctLetterStyle:   renderer.NewStyle().Foreground(lipgloss.Color("32")),
+		misplacedLatterStyle: renderer.NewStyle().Foreground(lipgloss.Color("33")),
+		currentAttempt:       2,
+		currentChar:          1,
+		attempts:             6,
+		wordLenght:           5,
+		err:                  "",
+		answer:               "hence",
+		answerMap:            make(map[rune]int),
 	}
 
-    // This is temporary
+	// This is temporary
 	m.gameState = [][]string{
 		{"a", "a", "a", "a", "a"},
 		{"a", "a", "a", "a", "a"},
@@ -64,20 +69,29 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 }
 
 type model struct {
-	currentAttempt int
-	currentChar    int
-	attempts       int
-	wordLenght     int
-	term           string
-	gameState     [][]string
-	width          int
-	height         int
-	bg             string
-	txtStyle       lipgloss.Style
-	quitStyle      lipgloss.Style
+	answer               string
+	answerMap            map[rune]int
+	currentAttempt       int
+	currentChar          int
+	attempts             int
+	wordLenght           int
+	term                 string
+	err                  string
+	gameState            [][]string
+	width                int
+	height               int
+	bg                   string
+	txtStyle             lipgloss.Style
+	correctLetterStyle   lipgloss.Style
+	misplacedLatterStyle lipgloss.Style
+	incorrectLetterStyle lipgloss.Style
+	quitStyle            lipgloss.Style
 }
 
 func (m model) Init() tea.Cmd {
+	for _, c := range m.answer {
+		m.answerMap[c]++
+	}
 	return nil
 }
 
@@ -96,6 +110,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.String() == "backspace" && m.currentChar > 0 {
 			m.currentChar--
+		}
+		if msg.String() == "enter" {
+			if m.currentChar < m.wordLenght {
+				m.err = "Word is too short"
+				return m, nil
+			}
+            enteredWordRunes := make([]rune, m.wordLenght)
+			for i, c := range m.gameState[m.currentAttempt] {
+				enteredWordRunes[i] = []rune(c)[0]
+			}
+			for i := 0; i < m.wordLenght; i++ {
+				if []rune(m.answer)[i] == []rune(enteredWordRunes)[i] {
+					m.gameState[m.currentAttempt][i] = m.correctLetterStyle.Render(m.gameState[m.currentAttempt][i])
+				}
+			}
+			m.currentAttempt++
 		}
 	}
 	return m, nil
@@ -133,7 +163,7 @@ func (m model) View() string {
 	}
 
 	s += "└───┴───┴───┴───┴───┘\n"
-	return m.txtStyle.Render(s) + "\n\n" + m.quitStyle.Render("Press 'q' to quit\n")
+	return s + "\n\n" + m.quitStyle.Render("Press 'q' to quit\n")
 }
 
 func main() {

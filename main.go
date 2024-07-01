@@ -37,18 +37,18 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	}
 
 	m := model{
-		term:      pty.Term,
-		width:     pty.Window.Width,
-		height:    pty.Window.Height,
-		bg:        bg,
-		txtStyle:  txtStyle,
-		quitStyle: quitStyle,
+		term:           pty.Term,
+		width:          pty.Window.Width,
+		height:         pty.Window.Height,
+		bg:             bg,
+		txtStyle:       txtStyle,
+		quitStyle:      quitStyle,
+		currentAttempt: 100,
+		currentChar:    100,
+		attempts:       6,
+		wordLenght:     5,
 	}
 
-	m.currentAttempt = 100
-	m.currentChar = 100
-	m.attempts = 6
-	m.wordLenght = 5
 	return m, []tea.ProgramOption{tea.WithAltScreen()}
 }
 
@@ -90,8 +90,8 @@ func (m model) View() string {
 		if i < m.currentAttempt {
 			s += "│"
 			for j := 0; j < m.wordLenght; j++ {
-				s += "   "
-				s += "│"
+				s += " "
+				s += " │ "
 			}
 		}
 		if i == m.currentAttempt {

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -170,17 +171,18 @@ func stringWidth(str string) int {
 	width := 0
 
 	for _, line := range lines {
-		width = max(len(line), width)
+		width = max(utf8.RuneCountInString(line), width)
 	}
 
 	return width
 }
 func centerStringHorizontally(width int, height int, str string) string {
-	// TODO:
-	return str
+	padding := strings.Repeat(" ", (width - stringWidth(str))/2)
+	return strings.TrimRight(padding + strings.Replace(str, "\n", "\n"+padding, -1), " ")
 }
 
 func (m model) View() string {
+    // TODO: Add minimum screen length so the ssh session doesn't crash on screens that are too small
 	var s string
 	s += centerStringHorizontally(m.width, m.height, m.incorrectLetterStyle.Render(m.err))
 	if m.gameOver {
@@ -235,7 +237,7 @@ func (m model) View() string {
 		s += centerStringHorizontally(m.width, m.height, keyboardStr)
 	}
 
-	return s + "\n\n" + centerStringHorizontally(m.width, m.height, m.quitStyle.Render("Press 'q' to quit\n"))
+	return s + "\n\n" + m.quitStyle.Render(centerStringHorizontally(m.width, m.height, "Press 'q' to quit\n"))
 }
 
 func main() {

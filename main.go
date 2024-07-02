@@ -95,6 +95,7 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.err = ""
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
@@ -102,6 +103,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+		if m.gameOver {
+			return m, nil
 		}
 		if len(msg.String()) == 1 && unicode.IsLower([]rune(msg.String())[0]) && m.currentChar < m.wordLenght {
 			m.gameState[m.currentAttempt][m.currentChar] = msg.String()
@@ -161,38 +165,64 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func stringWidth(str string) int {
+	lines := strings.Split(str, "\n")
+	width := 0
+
+	for _, line := range lines {
+		width = max(len(line), width)
+	}
+
+	return width
+}
+func centerStringHorizontally(width int, height int, str string) string {
+	// TODO:
+	return str
+}
+
 func (m model) View() string {
-	s := "┌───┬───┬───┬───┬───┐\n"
+	var s string
+	s += centerStringHorizontally(m.width, m.height, m.incorrectLetterStyle.Render(m.err))
+	if m.gameOver {
+		if m.win {
+			s += m.correctLetterStyle.Render("You won")
+		} else {
+			s += m.incorrectLetterStyle.Render("You lost\nThe word was " + m.answer)
+		}
+	}
+	table := "\n┌───┬───┬───┬───┬───┐\n"
 	for i := 0; i < m.attempts; i++ {
 		if i < m.currentAttempt {
-			s += "│ "
+			table += "│ "
 			for j := 0; j < m.wordLenght; j++ {
-				s += m.gameState[i][j] + " │ "
+				table += m.gameState[i][j] + " │ "
 			}
 		}
 		if i == m.currentAttempt {
-			s += "│ "
+			table += "│ "
 			for j := 0; j < m.currentChar; j++ {
-				s += m.gameState[i][j] + " │ "
+				table += m.gameState[i][j] + " │ "
 			}
 			if m.currentChar != m.wordLenght {
-				s += "_ │ "
+				table += "_ │ "
 			}
 			for j := m.currentChar + 2; j <= m.wordLenght; j++ {
-				s += "  │ "
+				table += "  │ "
 			}
 		}
 		if i > m.currentAttempt {
-			s += "│   │   │   │   │   │"
+			table += "│   │   │   │   │   │"
 		}
-		s += "\n"
+		table += "\n"
 
 		if i != m.attempts-1 {
-			s += "├───┼───┼───┼───┼───┤\n"
+			table += "├───┼───┼───┼───┼───┤\n"
 		}
 	}
 
-	s += "└───┴───┴───┴───┴───┘\n"
+	table += "└───┴───┴───┴───┴───┘\n"
+
+	s += centerStringHorizontally(m.width, m.height, table)
 
 	bytes, err := os.ReadFile("keyboard")
 	if err != nil {
@@ -202,17 +232,10 @@ func (m model) View() string {
 		for key, style := range m.keyboardState {
 			keyboardStr = strings.Replace(keyboardStr, string(unicode.ToUpper(key)), style.Render(string(unicode.ToUpper(key))), -1)
 		}
-		s += keyboardStr
+		s += centerStringHorizontally(m.width, m.height, keyboardStr)
 	}
 
-	if m.gameOver {
-		if m.win {
-			s += "You won"
-		} else {
-			s += "You lost\nThe word was " + m.answer
-		}
-	}
-	return s + "\n\n" + m.quitStyle.Render("Press 'q' to quit\n")
+	return s + "\n\n" + centerStringHorizontally(m.width, m.height, m.quitStyle.Render("Press 'q' to quit\n"))
 }
 
 func main() {

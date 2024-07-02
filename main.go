@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	"unicode"
@@ -36,10 +37,10 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	}
 
 	m := model{
-		term:   pty.Term,
-		width:  pty.Window.Width,
-		height: pty.Window.Height,
-		bg:     bg,
+		term:                 pty.Term,
+		width:                pty.Window.Width,
+		height:               pty.Window.Height,
+		bg:                   bg,
 		txtStyle:             renderer.NewStyle().Foreground(lipgloss.Color("10")),
 		quitStyle:            renderer.NewStyle().Foreground(lipgloss.Color("8")),
 		incorrectLetterStyle: renderer.NewStyle().Foreground(lipgloss.Color("#ff0000")),
@@ -54,6 +55,7 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 		answerMap:            make(map[rune]int),
 		gameOver:             false,
 		win:                  false,
+		keyboardState:        make(map[rune]lipgloss.Style),
 	}
 	m.gameState = make([][]string, m.attempts)
 	for i := range m.gameState {
@@ -74,6 +76,7 @@ type model struct {
 	term                 string
 	err                  string
 	gameState            [][]string
+	keyboardState        map[rune]lipgloss.Style
 	width                int
 	height               int
 	bg                   string
@@ -123,6 +126,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.gameState[m.currentAttempt][i] = m.correctLetterStyle.Render(m.gameState[m.currentAttempt][i])
 					aTemporaryMap[enteredWordRunes[i]]++
 					correctLetters++
+					m.keyboardState[enteredWordRunes[i]] = m.correctLetterStyle
 				}
 			}
 			if correctLetters == m.wordLenght {
@@ -136,8 +140,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.answerMap[currentRune]-aTemporaryMap[currentRune] > 0 {
 						m.gameState[m.currentAttempt][i] = m.misplacedLatterStyle.Render(m.gameState[m.currentAttempt][i])
 						aTemporaryMap[currentRune]++
+						if _, ok := m.keyboardState[currentRune]; !ok {
+							m.keyboardState[currentRune] = m.misplacedLatterStyle
+						}
 					} else {
 						m.gameState[m.currentAttempt][i] = m.incorrectLetterStyle.Render(m.gameState[m.currentAttempt][i])
+						if _, ok := m.keyboardState[currentRune]; !ok {
+							m.keyboardState[currentRune] = m.incorrectLetterStyle
+						}
 					}
 				}
 			}
@@ -183,6 +193,17 @@ func (m model) View() string {
 	}
 
 	s += "└───┴───┴───┴───┴───┘\n"
+
+	bytes, err := os.ReadFile("keyboard")
+	if err != nil {
+		log.Errorf("There was a problem opening the keyoard file: %v", err)
+	} else {
+		keyboardStr := string(bytes)
+		for key, style := range m.keyboardState {
+			keyboardStr = strings.Replace(keyboardStr, string(unicode.ToUpper(key)), style.Render(string(unicode.ToUpper(key))), -1)
+		}
+		s += keyboardStr
+	}
 
 	if m.gameOver {
 		if m.win {

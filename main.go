@@ -36,39 +36,35 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	}
 
 	m := model{
-		term:                 pty.Term,
-		width:                pty.Window.Width,
-		height:               pty.Window.Height,
-		bg:                   bg,
-        // TODO: Fix colors
+		term:   pty.Term,
+		width:  pty.Window.Width,
+		height: pty.Window.Height,
+		bg:     bg,
 		txtStyle:             renderer.NewStyle().Foreground(lipgloss.Color("10")),
 		quitStyle:            renderer.NewStyle().Foreground(lipgloss.Color("8")),
 		incorrectLetterStyle: renderer.NewStyle().Foreground(lipgloss.Color("#ff0000")),
-        correctLetterStyle:   renderer.NewStyle().Foreground(lipgloss.Color("#00ff00")),
+		correctLetterStyle:   renderer.NewStyle().Foreground(lipgloss.Color("#00ff00")),
 		misplacedLatterStyle: renderer.NewStyle().Foreground(lipgloss.Color("#ffff00")),
-		currentAttempt:       2,
-		currentChar:          1,
+		currentAttempt:       0,
+		currentChar:          0,
 		attempts:             6,
 		wordLenght:           5,
 		err:                  "",
 		answer:               "hence",
 		answerMap:            make(map[rune]int),
+		gameOver:             false,
+		win:                  false,
 	}
-
-	// This is temporary
-	m.gameState = [][]string{
-		{"a", "a", "a", "a", "a"},
-		{"a", "a", "a", "a", "a"},
-		{"a", "a", "a", "a", "a"},
-		{"a", "a", "a", "a", "a"},
-		{"a", "a", "a", "a", "a"},
-		{"a", "a", "a", "a", "a"},
+	m.gameState = make([][]string, m.attempts)
+	for i := range m.gameState {
+		m.gameState[i] = make([]string, m.wordLenght)
 	}
-
 	return m, []tea.ProgramOption{tea.WithAltScreen()}
 }
 
 type model struct {
+	win                  bool
+	gameOver             bool
 	answer               string
 	answerMap            map[rune]int
 	currentAttempt       int
@@ -116,16 +112,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.err = "Word is too short"
 				return m, nil
 			}
-            enteredWordRunes := make([]rune, m.wordLenght)
+			enteredWordRunes := make([]rune, m.wordLenght)
 			for i, c := range m.gameState[m.currentAttempt] {
 				enteredWordRunes[i] = []rune(c)[0]
 			}
+			aTemporaryMap := make(map[rune]int)
+			correctLetters := 0
 			for i := 0; i < m.wordLenght; i++ {
-				if []rune(m.answer)[i] == []rune(enteredWordRunes)[i] {
+				if []rune(m.answer)[i] == enteredWordRunes[i] {
 					m.gameState[m.currentAttempt][i] = m.correctLetterStyle.Render(m.gameState[m.currentAttempt][i])
+					aTemporaryMap[enteredWordRunes[i]]++
+					correctLetters++
+				}
+			}
+			if correctLetters == m.wordLenght {
+				m.win = true
+				m.gameOver = true
+				return m, nil
+			}
+			for i := 0; i < m.wordLenght; i++ {
+				if len(m.gameState[m.currentAttempt][i]) == 1 {
+					currentRune := []rune(m.gameState[m.currentAttempt][i])[0]
+					if m.answerMap[currentRune]-aTemporaryMap[currentRune] > 0 {
+						m.gameState[m.currentAttempt][i] = m.misplacedLatterStyle.Render(m.gameState[m.currentAttempt][i])
+						aTemporaryMap[currentRune]++
+					} else {
+						m.gameState[m.currentAttempt][i] = m.incorrectLetterStyle.Render(m.gameState[m.currentAttempt][i])
+					}
 				}
 			}
 			m.currentAttempt++
+			m.currentChar = 0
+			if m.currentAttempt == m.attempts {
+				m.gameOver = true
+			}
 		}
 	}
 	return m, nil
@@ -163,6 +183,14 @@ func (m model) View() string {
 	}
 
 	s += "└───┴───┴───┴───┴───┘\n"
+
+	if m.gameOver {
+		if m.win {
+			s += "You won"
+		} else {
+			s += "You lost\nThe word was " + m.answer
+		}
+	}
 	return s + "\n\n" + m.quitStyle.Render("Press 'q' to quit\n")
 }
 

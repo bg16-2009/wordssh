@@ -43,9 +43,9 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
         // TODO: Fix colors
 		txtStyle:             renderer.NewStyle().Foreground(lipgloss.Color("10")),
 		quitStyle:            renderer.NewStyle().Foreground(lipgloss.Color("8")),
-		incorrectLetterStyle: renderer.NewStyle().Foreground(lipgloss.Color("31")),
-		correctLetterStyle:   renderer.NewStyle().Foreground(lipgloss.Color("32")),
-		misplacedLatterStyle: renderer.NewStyle().Foreground(lipgloss.Color("33")),
+		incorrectLetterStyle: renderer.NewStyle().Foreground(lipgloss.Color("#ff0000")),
+        correctLetterStyle:   renderer.NewStyle().Foreground(lipgloss.Color("#00ff00")),
+		misplacedLatterStyle: renderer.NewStyle().Foreground(lipgloss.Color("#ffff00")),
 		currentAttempt:       2,
 		currentChar:          1,
 		attempts:             6,

@@ -1,6 +1,8 @@
 package pages
 
 import (
+	"io"
+	"math/rand/v2"
 	"os"
 	"strings"
 	"unicode"
@@ -12,8 +14,11 @@ import (
 	"github.com/charmbracelet/ssh"
 )
 
-func Game(renderer *lipgloss.Renderer, pty ssh.Pty) gameModel {
+func GameScreen(renderer *lipgloss.Renderer, pty ssh.Pty) gameModel {
 	m := gameModel{
+		renderer: renderer,
+		pty:      pty,
+
 		term:   pty.Term,
 		width:  pty.Window.Width,
 		height: pty.Window.Height,
@@ -24,18 +29,20 @@ func Game(renderer *lipgloss.Renderer, pty ssh.Pty) gameModel {
 		correctLetterStyle:   renderer.NewStyle().Foreground(lipgloss.Color("#00ff00")),
 		misplacedLatterStyle: renderer.NewStyle().Foreground(lipgloss.Color("#ffff00")),
 
-		answer:         "hence",
+		answer:         "",
 		answerMap:      make(map[rune]int),
 		currentAttempt: 0,
 		currentChar:    0,
 		attempts:       6,
 		wordLenght:     5,
 		keyboardState:  make(map[rune]lipgloss.Style),
+		wordlistLenght: 14855,
 
 		err:      "",
 		gameOver: false,
 		win:      false,
 	}
+	m.answer = getWordFromWordlist(rand.IntN(m.wordlistLenght), m.wordLenght)
 	m.gameState = make([][]string, m.attempts)
 	for i := range m.gameState {
 		m.gameState[i] = make([]string, m.wordLenght)
@@ -44,6 +51,9 @@ func Game(renderer *lipgloss.Renderer, pty ssh.Pty) gameModel {
 }
 
 type gameModel struct {
+	renderer *lipgloss.Renderer
+	pty      ssh.Pty
+
 	term   string
 	width  int
 	height int
@@ -62,6 +72,7 @@ type gameModel struct {
 	wordLenght     int
 	keyboardState  map[rune]lipgloss.Style
 	gameState      [][]string
+	wordlistLenght int
 
 	err      string
 	win      bool
@@ -146,6 +157,22 @@ func (m gameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func getWordFromWordlist(idx int, wordLenght int) string {
+	f, err := os.Open("wordlist")
+	if err != nil {
+		log.Errorf("Error opening wordlist: %v", err)
+	}
+	defer f.Close()
+
+	_, err = f.Seek(int64((wordLenght+1)*idx), io.SeekStart)
+	if err != nil {
+		log.Errorf("Error seeking in wordlist: %v", err)
+	}
+	word := make([]byte, wordLenght)
+	io.ReadAtLeast(f, word, wordLenght)
+	return string(word)
+}
+
 func stringWidth(str string) int {
 	lines := strings.Split(str, "\n")
 	width := 0
@@ -162,9 +189,11 @@ func centerStringHorizontally(width int, str string) string {
 }
 
 func (m gameModel) View() string {
+    st := m.renderer.NewStyle().Width(m.width).Align(lipgloss.Center)
 	// TODO: Add minimum screen length so the ssh session doesn't crash on screens that are too small
+    // TODO: Fix broken UI
 	var s string
-	s += centerStringHorizontally(m.width, m.incorrectLetterStyle.Render(m.err))
+	s += st.Render(m.incorrectLetterStyle.Render(m.err))
 	if m.gameOver {
 		if m.win {
 			s += m.correctLetterStyle.Render("You won")
@@ -204,7 +233,7 @@ func (m gameModel) View() string {
 
 	table += "└───┴───┴───┴───┴───┘\n"
 
-	s += centerStringHorizontally(m.width, table)
+	s += st.Render(table)
 
 	bytes, err := os.ReadFile("keyboard")
 	if err != nil {
@@ -214,8 +243,8 @@ func (m gameModel) View() string {
 		for key, style := range m.keyboardState {
 			keyboardStr = strings.Replace(keyboardStr, string(unicode.ToUpper(key)), style.Render(string(unicode.ToUpper(key))), -1)
 		}
-		s += centerStringHorizontally(m.width, keyboardStr)
+		s += st.Render(keyboardStr)
 	}
 
-	return s + "\n\n" + m.quitStyle.Render(centerStringHorizontally(m.width, "Press 'q' to quit\n"))
+	return s + "\n\n" + m.quitStyle.Render(st.Render("Press 'q' to quit\n"))
 }

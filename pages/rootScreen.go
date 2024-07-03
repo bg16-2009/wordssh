@@ -6,18 +6,23 @@ import (
 	"github.com/charmbracelet/ssh"
 )
 
-func RootScreen(renderer *lipgloss.Renderer, pty ssh.Pty) rootScreenModel{
-    return rootScreenModel{
-        renderer: renderer,
-        pty: pty,
-        currentScreen: Welcome(renderer, pty),
-    }
+type baseScreen struct {
+	renderer *lipgloss.Renderer
+	pty      ssh.Pty
+}
+
+func RootScreen(renderer *lipgloss.Renderer, pty ssh.Pty) rootScreenModel {
+	return rootScreenModel{
+		renderer:      renderer,
+		pty:           pty,
+		currentScreen: WelcomeScreen(renderer, pty),
+	}
 }
 
 type rootScreenModel struct {
 	currentScreen tea.Model
-    renderer *lipgloss.Renderer
-    pty ssh.Pty
+	renderer      *lipgloss.Renderer
+	pty           ssh.Pty
 }
 
 func (m rootScreenModel) Init() tea.Cmd {
@@ -32,7 +37,6 @@ func (m rootScreenModel) View() string {
 	return m.currentScreen.View()
 }
 
-func (m rootScreenModel) SwitchScreen(f func(*lipgloss.Renderer, ssh.Pty) gameModel) (tea.Model, tea.Cmd) {
-    m.currentScreen = f(m.renderer, m.pty)
-    return m.currentScreen, m.currentScreen.Init()
+func (m rootScreenModel) switchScreen(model tea.Model) (tea.Model, tea.Cmd) {
+	return model, model.Init()
 }

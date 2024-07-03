@@ -24,7 +24,6 @@ const (
 	port = "23234"
 )
 
-
 func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	pty, _, _ := s.Pty()
 

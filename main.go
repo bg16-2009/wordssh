@@ -6,14 +6,11 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
+	"github.com/bg16-2009/wordssh/pages"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
@@ -27,217 +24,13 @@ const (
 	port = "23234"
 )
 
+
 func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	pty, _, _ := s.Pty()
 
 	renderer := bubbletea.MakeRenderer(s)
 
-	bg := "light"
-	if renderer.HasDarkBackground() {
-		bg = "dark"
-	}
-
-	m := model{
-		term:                 pty.Term,
-		width:                pty.Window.Width,
-		height:               pty.Window.Height,
-		bg:                   bg,
-		txtStyle:             renderer.NewStyle().Foreground(lipgloss.Color("10")),
-		quitStyle:            renderer.NewStyle().Foreground(lipgloss.Color("8")),
-		incorrectLetterStyle: renderer.NewStyle().Foreground(lipgloss.Color("#ff0000")),
-		correctLetterStyle:   renderer.NewStyle().Foreground(lipgloss.Color("#00ff00")),
-		misplacedLatterStyle: renderer.NewStyle().Foreground(lipgloss.Color("#ffff00")),
-		currentAttempt:       0,
-		currentChar:          0,
-		attempts:             6,
-		wordLenght:           5,
-		err:                  "",
-		answer:               "hence",
-		answerMap:            make(map[rune]int),
-		gameOver:             false,
-		win:                  false,
-		keyboardState:        make(map[rune]lipgloss.Style),
-	}
-	m.gameState = make([][]string, m.attempts)
-	for i := range m.gameState {
-		m.gameState[i] = make([]string, m.wordLenght)
-	}
-	return m, []tea.ProgramOption{tea.WithAltScreen()}
-}
-
-type model struct {
-	win                  bool
-	gameOver             bool
-	answer               string
-	answerMap            map[rune]int
-	currentAttempt       int
-	currentChar          int
-	attempts             int
-	wordLenght           int
-	term                 string
-	err                  string
-	gameState            [][]string
-	keyboardState        map[rune]lipgloss.Style
-	width                int
-	height               int
-	bg                   string
-	txtStyle             lipgloss.Style
-	correctLetterStyle   lipgloss.Style
-	misplacedLatterStyle lipgloss.Style
-	incorrectLetterStyle lipgloss.Style
-	quitStyle            lipgloss.Style
-}
-
-func (m model) Init() tea.Cmd {
-	for _, c := range m.answer {
-		m.answerMap[c]++
-	}
-	return nil
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	m.err = ""
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.height = msg.Height
-		m.width = msg.Width
-	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
-			return m, tea.Quit
-		}
-		if m.gameOver {
-			return m, nil
-		}
-		if len(msg.String()) == 1 && unicode.IsLower([]rune(msg.String())[0]) && m.currentChar < m.wordLenght {
-			m.gameState[m.currentAttempt][m.currentChar] = msg.String()
-			m.currentChar++
-		}
-		if msg.String() == "backspace" && m.currentChar > 0 {
-			m.currentChar--
-		}
-		if msg.String() == "enter" {
-			if m.currentChar < m.wordLenght {
-				m.err = "Word is too short"
-				return m, nil
-			}
-			enteredWordRunes := make([]rune, m.wordLenght)
-			for i, c := range m.gameState[m.currentAttempt] {
-				enteredWordRunes[i] = []rune(c)[0]
-			}
-			aTemporaryMap := make(map[rune]int)
-			correctLetters := 0
-			for i := 0; i < m.wordLenght; i++ {
-				if []rune(m.answer)[i] == enteredWordRunes[i] {
-					m.gameState[m.currentAttempt][i] = m.correctLetterStyle.Render(m.gameState[m.currentAttempt][i])
-					aTemporaryMap[enteredWordRunes[i]]++
-					correctLetters++
-					m.keyboardState[enteredWordRunes[i]] = m.correctLetterStyle
-				}
-			}
-			if correctLetters == m.wordLenght {
-				m.win = true
-				m.gameOver = true
-				return m, nil
-			}
-			for i := 0; i < m.wordLenght; i++ {
-				if len(m.gameState[m.currentAttempt][i]) == 1 {
-					currentRune := []rune(m.gameState[m.currentAttempt][i])[0]
-					if m.answerMap[currentRune]-aTemporaryMap[currentRune] > 0 {
-						m.gameState[m.currentAttempt][i] = m.misplacedLatterStyle.Render(m.gameState[m.currentAttempt][i])
-						aTemporaryMap[currentRune]++
-						if _, ok := m.keyboardState[currentRune]; !ok {
-							m.keyboardState[currentRune] = m.misplacedLatterStyle
-						}
-					} else {
-						m.gameState[m.currentAttempt][i] = m.incorrectLetterStyle.Render(m.gameState[m.currentAttempt][i])
-						if _, ok := m.keyboardState[currentRune]; !ok {
-							m.keyboardState[currentRune] = m.incorrectLetterStyle
-						}
-					}
-				}
-			}
-			m.currentAttempt++
-			m.currentChar = 0
-			if m.currentAttempt == m.attempts {
-				m.gameOver = true
-			}
-		}
-	}
-	return m, nil
-}
-
-func stringWidth(str string) int {
-	lines := strings.Split(str, "\n")
-	width := 0
-
-	for _, line := range lines {
-		width = max(utf8.RuneCountInString(line), width)
-	}
-
-	return width
-}
-func centerStringHorizontally(width int, height int, str string) string {
-	padding := strings.Repeat(" ", (width - stringWidth(str))/2)
-	return strings.TrimRight(padding + strings.Replace(str, "\n", "\n"+padding, -1), " ")
-}
-
-func (m model) View() string {
-    // TODO: Add minimum screen length so the ssh session doesn't crash on screens that are too small
-	var s string
-	s += centerStringHorizontally(m.width, m.height, m.incorrectLetterStyle.Render(m.err))
-	if m.gameOver {
-		if m.win {
-			s += m.correctLetterStyle.Render("You won")
-		} else {
-			s += m.incorrectLetterStyle.Render("You lost\nThe word was " + m.answer)
-		}
-	}
-	table := "\n┌───┬───┬───┬───┬───┐\n"
-	for i := 0; i < m.attempts; i++ {
-		if i < m.currentAttempt {
-			table += "│ "
-			for j := 0; j < m.wordLenght; j++ {
-				table += m.gameState[i][j] + " │ "
-			}
-		}
-		if i == m.currentAttempt {
-			table += "│ "
-			for j := 0; j < m.currentChar; j++ {
-				table += m.gameState[i][j] + " │ "
-			}
-			if m.currentChar != m.wordLenght {
-				table += "_ │ "
-			}
-			for j := m.currentChar + 2; j <= m.wordLenght; j++ {
-				table += "  │ "
-			}
-		}
-		if i > m.currentAttempt {
-			table += "│   │   │   │   │   │"
-		}
-		table += "\n"
-
-		if i != m.attempts-1 {
-			table += "├───┼───┼───┼───┼───┤\n"
-		}
-	}
-
-	table += "└───┴───┴───┴───┴───┘\n"
-
-	s += centerStringHorizontally(m.width, m.height, table)
-
-	bytes, err := os.ReadFile("keyboard")
-	if err != nil {
-		log.Errorf("There was a problem opening the keyoard file: %v", err)
-	} else {
-		keyboardStr := string(bytes)
-		for key, style := range m.keyboardState {
-			keyboardStr = strings.Replace(keyboardStr, string(unicode.ToUpper(key)), style.Render(string(unicode.ToUpper(key))), -1)
-		}
-		s += centerStringHorizontally(m.width, m.height, keyboardStr)
-	}
-
-	return s + "\n\n" + m.quitStyle.Render(centerStringHorizontally(m.width, m.height, "Press 'q' to quit\n"))
+	return pages.RootScreen(renderer, pty), []tea.ProgramOption{tea.WithAltScreen()}
 }
 
 func main() {

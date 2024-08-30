@@ -6,16 +6,18 @@ import (
 	"github.com/charmbracelet/ssh"
 )
 
-func WelcomeScreen(renderer *lipgloss.Renderer, pty ssh.Pty) welcomeModel {
+func WelcomeScreen(isNewUser bool, renderer *lipgloss.Renderer, pty ssh.Pty) welcomeModel {
 	return welcomeModel{
-		renderer: renderer,
-		pty:      pty,
+		renderer:  renderer,
+		pty:       pty,
+		isNewUser: isNewUser,
 	}
 }
 
 type welcomeModel struct {
-	renderer *lipgloss.Renderer
-	pty      ssh.Pty
+	renderer  *lipgloss.Renderer
+	pty       ssh.Pty
+	isNewUser bool
 }
 
 func (m welcomeModel) Init() tea.Cmd {
@@ -36,5 +38,9 @@ func (m welcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m welcomeModel) View() string {
-	return "Welcome to WordSSH\nPress any key to play......"
+	if m.isNewUser {
+		return "Hello there new user! Welcome to WordSSH\nPress any key to play......"
+	} else {
+		return "Welcome back to WordSSH\nPress any key to play......"
+	}
 }

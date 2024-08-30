@@ -11,11 +11,11 @@ type baseScreen struct {
 	pty      ssh.Pty
 }
 
-func RootScreen(renderer *lipgloss.Renderer, pty ssh.Pty) rootScreenModel {
+func RootScreen(isNewUser bool, renderer *lipgloss.Renderer, pty ssh.Pty) rootScreenModel {
 	return rootScreenModel{
 		renderer:      renderer,
 		pty:           pty,
-		currentScreen: WelcomeScreen(renderer, pty),
+		currentScreen: WelcomeScreen(isNewUser, renderer, pty),
 	}
 }
 

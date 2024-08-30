@@ -9,6 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+
 	"github.com/bg16-2009/wordssh/pages"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
@@ -23,22 +26,47 @@ const (
 	host = "localhost"
 	port = "23234"
 )
+var isNewUser bool
 
 func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	pty, _, _ := s.Pty()
 
 	renderer := bubbletea.MakeRenderer(s)
 
-	return pages.RootScreen(renderer, pty), []tea.ProgramOption{tea.WithAltScreen()}
+	return pages.RootScreen(isNewUser, renderer, pty), []tea.ProgramOption{tea.WithAltScreen()}
+}
+
+type User struct {
+	Username  string
+	PublicKey []byte
 }
 
 func main() {
+	db, err := gorm.Open(sqlite.Open("db.db"), &gorm.Config{})
+	if err != nil {
+		panic("failed to connect database")
+	}
+	db.AutoMigrate(&User{})
+	if err != nil {
+		panic(err)
+	}
+
 	s, err := wish.NewServer(
 		wish.WithAddress(net.JoinHostPort(host, port)),
 		wish.WithHostKeyPath(".ssh/id_ed25519"),
+		wish.WithPublicKeyAuth(func(_ ssh.Context, key ssh.PublicKey) bool {
+			var user User
+			result := db.First(&user, "public_key = ?", key.Marshal())
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+                isNewUser = true
+			} else {
+                isNewUser = false
+			}
+			return true
+		}),
 		wish.WithMiddleware(
 			bubbletea.Middleware(teaHandler),
-			activeterm.Middleware(), // Bubble Tea apps usually require a PTY.
+			activeterm.Middleware(),
 			logging.Middleware(),
 		),
 	)

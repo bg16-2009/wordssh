@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -115,6 +114,11 @@ func (m gameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for i, c := range m.gameState[m.currentAttempt] {
 				enteredWordRunes[i] = []rune(c)[0]
 			}
+			if !chechIfWordIsInWordlist(string(enteredWordRunes), m.wordlistLenght) {
+				m.err = "Invalid word"
+				return m, nil
+			}
+
 			aTemporaryMap := make(map[rune]int)
 			correctLetters := 0
 			for i := 0; i < m.wordLenght; i++ {
@@ -172,26 +176,34 @@ func getWordFromWordlist(idx int, wordLenght int) string {
 	io.ReadAtLeast(f, word, wordLenght)
 	return string(word)
 }
-
-func stringWidth(str string) int {
-	lines := strings.Split(str, "\n")
-	width := 0
-
-	for _, line := range lines {
-		width = max(utf8.RuneCountInString(line), width)
+func chechIfWordIsInWordlist(targetWord string, wordlistLength int) bool {
+	var (
+		left       = 0
+		right      = wordlistLength - 1
+		middle     = (left + right) / 2
+		wordLenght = len(targetWord)
+	)
+	for {
+		if left > right {
+			return false
+		}
+		word := getWordFromWordlist(middle, wordLenght)
+		if word == targetWord {
+			return true
+		}
+		if word < targetWord {
+			left = middle + 1
+		} else {
+			right = middle - 1
+		}
+		middle = (left + right) / 2
 	}
+}
 
-	return width
-}
-func centerStringHorizontally(width int, str string) string {
-	padding := strings.Repeat(" ", (width-stringWidth(str))/2)
-	return strings.TrimRight(padding+strings.Replace(str, "\n", "\n"+padding, -1), " ")
-}
+// 1 2 3 4 5 6 8 9 10
 
 func (m gameModel) View() string {
-    st := m.renderer.NewStyle().Width(m.width).Align(lipgloss.Center)
-	// TODO: Add minimum screen length so the ssh session doesn't crash on screens that are too small
-    // TODO: Fix broken UI
+	st := m.renderer.NewStyle().Width(m.width).Align(lipgloss.Center)
 	var s string
 	s += st.Render(m.incorrectLetterStyle.Render(m.err))
 	if m.gameOver {
@@ -201,16 +213,16 @@ func (m gameModel) View() string {
 			s += m.incorrectLetterStyle.Render("You lost\nThe word was " + m.answer)
 		}
 	}
-	table := "\n┌───┬───┬───┬───┬───┐\n"
+	table := "\n ┌───┬───┬───┬───┬───┐ \n"
 	for i := 0; i < m.attempts; i++ {
 		if i < m.currentAttempt {
-			table += "│ "
+			table += " │ "
 			for j := 0; j < m.wordLenght; j++ {
 				table += m.gameState[i][j] + " │ "
 			}
 		}
 		if i == m.currentAttempt {
-			table += "│ "
+			table += " │ "
 			for j := 0; j < m.currentChar; j++ {
 				table += m.gameState[i][j] + " │ "
 			}
@@ -222,22 +234,22 @@ func (m gameModel) View() string {
 			}
 		}
 		if i > m.currentAttempt {
-			table += "│   │   │   │   │   │"
+			table += " │   │   │   │   │   │ "
 		}
 		table += "\n"
 
 		if i != m.attempts-1 {
-			table += "├───┼───┼───┼───┼───┤\n"
+			table += " ├───┼───┼───┼───┼───┤ \n"
 		}
 	}
 
-	table += "└───┴───┴───┴───┴───┘\n"
+	table += " └───┴───┴───┴───┴───┘ \n"
 
 	s += st.Render(table)
 
 	bytes, err := os.ReadFile("keyboard")
 	if err != nil {
-		log.Errorf("There was a problem opening the keyoard file: %v", err)
+		log.Errorf("There was a problem opening the keyboard file: %v", err)
 	} else {
 		keyboardStr := string(bytes)
 		for key, style := range m.keyboardState {
@@ -245,6 +257,6 @@ func (m gameModel) View() string {
 		}
 		s += st.Render(keyboardStr)
 	}
-
-	return s + "\n\n" + m.quitStyle.Render(st.Render("Press 'q' to quit\n"))
+	s += "\n" + m.quitStyle.Render(st.Render("Press 'q' to quit\n"))
+	return m.renderer.PlaceVertical(m.height, lipgloss.Center, s)
 }

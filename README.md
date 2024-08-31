@@ -15,7 +15,7 @@ The server will run on localhost:23234 by default. To change that, you can edit 
 
 ## How to connect to the server
 
-1. Run `ssh <server ip> -p <server port>` (You must have a SSH private/public key pair)
+Run `ssh <server ip> -p <server port>` (You must have a SSH private/public key pair)
 
 
 To generate one you can run `ssh-keygen` and follow the steps.

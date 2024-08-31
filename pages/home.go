@@ -46,6 +46,8 @@ func (m homeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "n":
 			return rootScreenModel{}.switchScreen(GameScreen(m.renderer, m.pty, m.db, m.user))
+		case "l":
+			return rootScreenModel{}.switchScreen(LeaderboardScreen(m.user.Username, m.renderer, m.pty, m.db))
 		}
 	}
 	return m, nil
@@ -56,6 +58,10 @@ func (m homeModel) View() string {
 ┌────────────┐
 │ n New Game │
 └────────────┘`[1:]
+	leaderboardButton := `
+┌───────────────┐
+│ l Leaderboard │
+└───────────────┘`[1:]
 	greeting := fmt.Sprintf("\nHi %s", m.user.Username)
 	return lipgloss.JoinVertical(
 		lipgloss.Center,
@@ -66,6 +72,7 @@ func (m homeModel) View() string {
 				lipgloss.Center,
 				fmt.Sprintf("Your score is %d\n\n", m.user.Score),
 				newGameButton,
+                leaderboardButton,
 			),
 		),
 	)

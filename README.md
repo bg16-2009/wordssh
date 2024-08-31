@@ -1,3 +1,3 @@
 # WordSSH
 
-Play wordle via ssh against friends
+Play wordle via ssh and earn points

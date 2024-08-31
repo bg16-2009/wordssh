@@ -45,7 +45,7 @@ func LeaderboardScreen(username string, renderer *lipgloss.Renderer, pty ssh.Pty
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	t.SetStyles(s)
-    t.Focus()
+	t.Focus()
 
 	return leaderboardModel{
 		width:  pty.Window.Width,
@@ -84,10 +84,12 @@ func (m leaderboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "b":
+			return rootScreenModel{}.switchScreen(HomeScreen(m.username, m.renderer, m.pty, m.db))
 		}
 	}
-    var cmd tea.Cmd
-    m.table, cmd = m.table.Update(msg)
+	var cmd tea.Cmd
+	m.table, cmd = m.table.Update(msg)
 	return m, cmd
 }
 
@@ -97,7 +99,7 @@ func (m leaderboardModel) View() string {
 		lipgloss.JoinVertical(
 			lipgloss.Center,
 			m.baseStyle.Render(m.table.View())+"\n  "+m.table.HelpView()+"\n",
-			"Press any key to go back",
+			m.renderer.NewStyle().Foreground(lipgloss.Color("8")).Render("Press 'b' to go back"),
 		),
 	)
 }

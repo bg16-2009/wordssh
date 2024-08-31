@@ -99,11 +99,11 @@ func (m gameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
+		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
 		if m.gameOver {
-			return m, nil
+			return rootScreenModel{}.switchScreen(HomeScreen(m.currentUser.Username, m.renderer, m.pty, m.db))
 		}
 		if len(msg.String()) == 1 && unicode.IsLower([]rune(msg.String())[0]) && m.currentChar < m.wordLenght {
 			m.gameState[m.currentAttempt][m.currentChar] = msg.String()
@@ -216,7 +216,7 @@ func (m gameModel) View() string {
 			s += st.Render(m.correctLetterStyle.Render("\nYou won\n"))
 			m.db.Model(&m.currentUser).Update("Score", m.currentUser.Score+(uint(m.attempts-m.currentAttempt)*100))
 		} else {
-			s += st.Render(m.incorrectLetterStyle.Render("\nYou lost\nThe word was " + m.answer))
+			s += st.Render(m.incorrectLetterStyle.Render(lipgloss.JoinVertical(lipgloss.Center, "\nYou lost", "The word was "+m.answer)))
 		}
 	}
 	table := "\n ┌───┬───┬───┬───┬───┐ \n"
@@ -263,6 +263,8 @@ func (m gameModel) View() string {
 		}
 		s += st.Render(keyboardStr)
 	}
-	s += "\n" + m.quitStyle.Render(st.Render("Press 'q' to quit\n"))
+	if m.gameOver {
+		s += "\n" + m.quitStyle.Render(st.Render("Press any key to go back\n"))
+	}
 	return m.renderer.PlaceVertical(m.height, lipgloss.Center, s)
 }

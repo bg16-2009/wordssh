@@ -16,6 +16,9 @@ func WelcomeScreen(newUserPublicKey []byte, renderer *lipgloss.Renderer, pty ssh
 	ti.CharLimit = 16
 	ti.Width = 20
 	return welcomeModel{
+		width:  pty.Window.Width,
+		height: pty.Window.Height,
+
 		renderer:         renderer,
 		pty:              pty,
 		newUserPublicKey: newUserPublicKey,
@@ -25,6 +28,9 @@ func WelcomeScreen(newUserPublicKey []byte, renderer *lipgloss.Renderer, pty ssh
 }
 
 type welcomeModel struct {
+	width  int
+	height int
+
 	renderer         *lipgloss.Renderer
 	pty              ssh.Pty
 	textInput        textinput.Model
@@ -42,14 +48,14 @@ func (m welcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
-        case "enter":
-            m.textInput.Blur()
-            m.db.Create(&models.User{
-                Username: m.textInput.Value(),
-                PublicKey: m.newUserPublicKey,
-                Score: 0,
-            })
-            // return rootScreenModel{}.switchScreen(HomeScreen(m.textInput.Value(), m.renderer, m.pty, m.db))
+		case "enter":
+			m.textInput.Blur()
+			m.db.Create(&models.User{
+				Username:  m.textInput.Value(),
+				PublicKey: m.newUserPublicKey,
+				Score:     0,
+			})
+			return rootScreenModel{}.switchScreen(HomeScreen(m.textInput.Value(), m.renderer, m.pty, m.db))
 		}
 	}
 	var cmd tea.Cmd
@@ -58,5 +64,13 @@ func (m welcomeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m welcomeModel) View() string {
-	return "Hello there new user! Welcome to WordSSH\n\n" + m.textInput.View();
+	return m.renderer.Place(
+		m.width, m.height, lipgloss.Center, lipgloss.Center,
+		lipgloss.JoinVertical(
+			lipgloss.Center,
+			"Hello there new user!",
+			"Welcome to WordSSH\n",
+			m.textInput.View(),
+		),
+	)
 }

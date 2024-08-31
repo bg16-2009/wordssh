@@ -7,18 +7,19 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/bg16-2009/wordssh/models"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
+	"gorm.io/gorm"
 )
 
-func GameScreen(renderer *lipgloss.Renderer, pty ssh.Pty) gameModel {
+func GameScreen(renderer *lipgloss.Renderer, pty ssh.Pty, db *gorm.DB, currentUser models.User) gameModel {
 	m := gameModel{
 		renderer: renderer,
 		pty:      pty,
 
-		term:   pty.Term,
 		width:  pty.Window.Width,
 		height: pty.Window.Height,
 
@@ -40,6 +41,9 @@ func GameScreen(renderer *lipgloss.Renderer, pty ssh.Pty) gameModel {
 		err:      "",
 		gameOver: false,
 		win:      false,
+
+		db:          db,
+		currentUser: currentUser,
 	}
 	m.answer = getWordFromWordlist(rand.IntN(m.wordlistLenght), m.wordLenght)
 	m.gameState = make([][]string, m.attempts)
@@ -76,6 +80,9 @@ type gameModel struct {
 	err      string
 	win      bool
 	gameOver bool
+
+	db          *gorm.DB
+	currentUser models.User
 }
 
 func (m gameModel) Init() tea.Cmd {
@@ -200,17 +207,16 @@ func chechIfWordIsInWordlist(targetWord string, wordlistLength int) bool {
 	}
 }
 
-// 1 2 3 4 5 6 8 9 10
-
 func (m gameModel) View() string {
 	st := m.renderer.NewStyle().Width(m.width).Align(lipgloss.Center)
 	var s string
 	s += st.Render(m.incorrectLetterStyle.Render(m.err))
 	if m.gameOver {
 		if m.win {
-			s += m.correctLetterStyle.Render("You won")
+			s += st.Render(m.correctLetterStyle.Render("\nYou won\n"))
+			m.db.Model(&m.currentUser).Update("Score", m.currentUser.Score+(uint(m.attempts-m.currentAttempt)*100))
 		} else {
-			s += m.incorrectLetterStyle.Render("You lost\nThe word was " + m.answer)
+			s += st.Render(m.incorrectLetterStyle.Render("\nYou lost\nThe word was " + m.answer))
 		}
 	}
 	table := "\n ┌───┬───┬───┬───┬───┐ \n"

@@ -45,7 +45,8 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 }
 
 func main() {
-	db, err := gorm.Open(sqlite.Open("db.db"), &gorm.Config{})
+    var err error
+	db, err = gorm.Open(sqlite.Open("db.db"), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect database")
 	}

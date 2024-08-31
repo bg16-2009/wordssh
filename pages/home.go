@@ -14,6 +14,9 @@ func HomeScreen(username string, renderer *lipgloss.Renderer, pty ssh.Pty, db *g
 	var user models.User
 	db.First(&user, "username = ?", username)
 	return homeModel{
+		width:  pty.Window.Width,
+		height: pty.Window.Height,
+
 		renderer: renderer,
 		pty:      pty,
 		db:       db,
@@ -22,6 +25,9 @@ func HomeScreen(username string, renderer *lipgloss.Renderer, pty ssh.Pty, db *g
 }
 
 type homeModel struct {
+	width  int
+	height int
+
 	renderer *lipgloss.Renderer
 	pty      ssh.Pty
 	db       *gorm.DB
@@ -38,11 +44,29 @@ func (m homeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "n":
+			return rootScreenModel{}.switchScreen(GameScreen(m.renderer, m.pty, m.db, m.user))
 		}
 	}
 	return m, nil
 }
 
 func (m homeModel) View() string {
-	return fmt.Sprintf("Hi %s\nPress any key to play......", m.user.Username)
+	newGameButton := `
+┌────────────┐
+│ n New Game │
+└────────────┘`[1:]
+	greeting := fmt.Sprintf("\nHi %s", m.user.Username)
+	return lipgloss.JoinVertical(
+		lipgloss.Center,
+		greeting,
+		m.renderer.Place(
+			m.width, m.height-2, lipgloss.Center, lipgloss.Center,
+			lipgloss.JoinVertical(
+				lipgloss.Center,
+				fmt.Sprintf("Your score is %d\n\n", m.user.Score),
+				newGameButton,
+			),
+		),
+	)
 }

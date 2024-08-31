@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bg16-2009/wordssh/models"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -26,19 +28,20 @@ const (
 	host = "localhost"
 	port = "23234"
 )
-var isNewUser bool
+
+var (
+	isNewUser        bool
+	username         string
+	newUserPublicKey []byte
+	db               *gorm.DB
+)
 
 func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	pty, _, _ := s.Pty()
 
 	renderer := bubbletea.MakeRenderer(s)
 
-	return pages.RootScreen(isNewUser, renderer, pty), []tea.ProgramOption{tea.WithAltScreen()}
-}
-
-type User struct {
-	Username  string
-	PublicKey []byte
+	return pages.RootScreen(username, newUserPublicKey, isNewUser, renderer, pty, db), []tea.ProgramOption{tea.WithAltScreen()}
 }
 
 func main() {
@@ -46,7 +49,7 @@ func main() {
 	if err != nil {
 		panic("failed to connect database")
 	}
-	db.AutoMigrate(&User{})
+	db.AutoMigrate(&models.User{})
 	if err != nil {
 		panic(err)
 	}
@@ -55,12 +58,14 @@ func main() {
 		wish.WithAddress(net.JoinHostPort(host, port)),
 		wish.WithHostKeyPath(".ssh/id_ed25519"),
 		wish.WithPublicKeyAuth(func(_ ssh.Context, key ssh.PublicKey) bool {
-			var user User
+			var user models.User
 			result := db.First(&user, "public_key = ?", key.Marshal())
 			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-                isNewUser = true
+				isNewUser = true
+				newUserPublicKey = key.Marshal()
 			} else {
-                isNewUser = false
+                username = user.Username
+				isNewUser = false
 			}
 			return true
 		}),

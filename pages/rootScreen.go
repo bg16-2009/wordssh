@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
+	"gorm.io/gorm"
 )
 
 type baseScreen struct {
@@ -11,18 +12,20 @@ type baseScreen struct {
 	pty      ssh.Pty
 }
 
-func RootScreen(isNewUser bool, renderer *lipgloss.Renderer, pty ssh.Pty) rootScreenModel {
+func RootScreen(username string, newUserPublicKey []byte, isNewUser bool, renderer *lipgloss.Renderer, pty ssh.Pty, db *gorm.DB) rootScreenModel {
+	var currentScreen tea.Model
+	if isNewUser {
+		currentScreen = WelcomeScreen(newUserPublicKey, renderer, pty, db)
+	} else {
+		currentScreen = HomeScreen(username, renderer, pty, db)
+	}
 	return rootScreenModel{
-		renderer:      renderer,
-		pty:           pty,
-		currentScreen: WelcomeScreen(isNewUser, renderer, pty),
+		currentScreen: currentScreen,
 	}
 }
 
 type rootScreenModel struct {
 	currentScreen tea.Model
-	renderer      *lipgloss.Renderer
-	pty           ssh.Pty
 }
 
 func (m rootScreenModel) Init() tea.Cmd {
